@@ -1,0 +1,48 @@
+.btn.btn-android {
+  background-color: #97C03E;
+  border-color: #91B744;
+  color:white;
+  width:74px;
+}
+.btn.btn-android:hover,
+.btn.btn-android:active,
+.btn.btn-android.hover {
+  background-color: #91B744;
+}
+
+.btn.btn-ios {
+  background-color: #ABABAB;
+  border-color: #646464;
+  color:white;
+  width:74px;
+}
+.btn.btn-ios:hover,
+.btn.btn-ios:active,
+.btn.btn-ios.hover {
+  background-color: #646464;
+}
+.margin-3{
+    margin:3px;
+}
+.margin-5{
+    margin:5px;
+}
+
+img.deletable{
+    cursor:not-allowed;
+}
+.right-side {
+    background-color:#f9f9f9;
+    margin-left:0px;
+}
+
+/* skin-blue navbar */
+.skin-blue .navbar {
+  background-color: #6ED25A;
+}
+.skin-blue .logo {
+    background-color:#54B840;
+}
+.skin-blue .logo:hover{
+    background-color:#349820;
+}
