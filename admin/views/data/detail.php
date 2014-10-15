@@ -17,7 +17,7 @@ if(!is_numeric($userId)) {
         return redirect(\library\Assets::uri('data/index.php'));
     }
 }
-
+$userId = (int)$userId;
 $data = $storage->User->get($userId);
 $user = $data['user'];
 if(!$user['token']) {
@@ -27,11 +27,11 @@ if($user) {
     $option = $data['option'];
     $photos = $data['photos'];
     $comments = $data['comments'];
-    $friends = $storage->UserFriend->getFriends($userId);
+    $friends = $storage->UserFriend->getFriendsAll($userId);
     $blocks = $storage->UserBlock->getBlocks($userId);
     $blockers = $storage->UserBlocker->getBlockers($userId);
-    $requestFrom = $storage->UserRequestFrom->getRequestFroms($userId);
-    $requestTo = $storage->UserRequestTo->getRequestTos($userId);
+    $requestFrom = $storage->UserRequestFrom->getRequests($userId);
+    $requestTo = $storage->UserRequestTo->getRequests($userId);
     $ids = mergeValue(array_keys($friends),array_keys($blocks),array_keys($blockers),array_keys($requestFrom),array_keys($requestTo));
     $users = $storage->User->primary($ids);
     $tokens = $storage->UserToken->getTokens($ids);
@@ -286,10 +286,10 @@ th,td{vertical-align:middle!important;}
                     <div class="box-header bg-red">
                         <h3 class="box-title"><i class="ion ion-checkmark-circled"> 管理者操作</i></h3>
                         <div class="box-tools pull-right">
-                            <button class="btn btn-sm" data-widget="collapse"><i class="fa fa-plus"></i></button>
+                            <button class="btn btn-sm" data-widget="collapse"><i class="fa fa-minus"></i></button>
                         </div>
                     </div>
-                    <div class="box-body" style="display:none;">
+                    <div class="box-body">
                         <table class="table table-bordered">
                             <tr>
                                 <th class="text-center" style="width:88px;">管理用メモ</th>
@@ -385,7 +385,7 @@ th,td{vertical-align:middle!important;}
                                 <td rowspan="5" colspan="2" class="text-center" style="width:210px;">
                                     <?php
                                         $_id = $user['image'] ? 'img_image' : '';
-                                        $_src = $user['image'] ? $user['image'] : \library\Assets::uri('noimage.png','img');
+                                        $_src = $user['image'] ? convertImg($user['image']) : \library\Assets::uri('noimage.png','img');
                                     ?>
                                     <img <?=$_id ? 'id="'.$_id.'"' : ''?> src="<?=$_src?>" height="200px" width="200px" class="margin-5 deletable"/>
                                 </td>
@@ -429,17 +429,21 @@ th,td{vertical-align:middle!important;}
                             <tr>
                                 <th>プロフィール</th>
                                 <td colspan="3">
-                                    <textarea class="form-control" readonly><?=escapetext($user['profile'])?></textarea>
+                                    <textarea class="form-control" readonly><?= escapetext($user['profile'])?></textarea>
                                 </td>
                             </tr>
                             <tr>
-                                <th rowspan="2">PUSH通知</th>
+                                <th rowspan="3">PUSH通知</th>
+                                <th>PUSH_ID</th>
+                                <td colspan="2"><?=$user['push_id']?></td>
+                            </tr>
+                            <tr>
                                 <th>友だちリクエスト受信時</th>
-                                <td colspan="2"><?=$option['push_friend'] == \library\Model_UserOption::FLAG_ON ? '送信する' : '送信しない' ?></td>
+                                <td colspan="2"><?=$option['push_friend'] == \library\Model_UserOption::FLAG_ON ? '受信する' : '受信しない' ?></td>
                             </tr>
                             <tr>
                                 <th>チャット受信時</th>
-                                <td colspan="2"><?=$option['push_chat'] == \library\Model_UserOption::FLAG_ON ? '送信する' : '送信しない' ?></td>
+                                <td colspan="2"><?=$option['push_chat'] == \library\Model_UserOption::FLAG_ON ? '受信する' : '受信しない' ?></td>
                             </tr>
                             <tr>
                                 <th rowspan="6">その他情報</th>
@@ -463,7 +467,7 @@ th,td{vertical-align:middle!important;}
                         <?php for($i=1;$i<=8;$i++):?>
                         <?php
                             $_id = isset($photos['photo_'.$i]) ? 'img_photo_' . $photos['photo_'.$i]['no'] : '';
-                            $_src = isset($photos['photo_'.$i]) ? $photos['photo_'.$i]['image'] : \library\Assets::uri('noimage.png','img');
+                            $_src = isset($photos['photo_'.$i]) ? convertImg($photos['photo_'.$i]['image']) : \library\Assets::uri('noimage.png','img');
                         ?>
                         <img <?=$_id ? 'id="'.$_id.'"' : ''?> src="<?=$_src?>" width="100px" height="100px" class="margin-3 deletable"/>
                         <?php endfor?>
@@ -550,7 +554,6 @@ var user_id = <?=$userId?>;
 var noimage = '<?=\library\Assets::uri('noimage.png','img')?>';
 $(function() {
     /* 最初から非表示な分を調整 */
-    $('.fa-plus')[0].click();
     $('#ban_time').daterangepicker({timePicker: true, timePickerIncrement: 30, format: 'YYYY/MM/DD HH:mm:ss'});
     var tableOption = {
         "bPaginate": true,

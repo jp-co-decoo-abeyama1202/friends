@@ -12,73 +12,35 @@ if(IS_TEST) {
     $_POST['params'] = json_encode($test_params);
 }
 */
-//受信jsonパラメータ
-$json = isset($_POST['params']) ? $_POST['params'] : '';
-$params = json_decode($json,true);
-
-//存在チェック
-$token = isset($params['user_id']) ? $params['user_id'] : null;
-if(is_null($token)) {
-    error_log('userPhotoAdd Error:[user_id] is not found');
-    http_response_code(400);
-    exit;
-}
 try {
-    $userId = $storage->UserToken->getIdFromToken($token);
-    if(!$userId) {
-        //存在しないユーザ
-        error_log('userPhotoAdd Error：this user is not found > '.$token);
-        http_response_code(400);
-        exit;
-    }
-    
-    $user = $storage->User->primaryOne($userId);
-    if(!$user) {
-        //存在しないユーザ
-        error_log('userPhotoAdd Error：this user is not found > '.$userId);
-        http_response_code(400);
-        exit;
-    }
-} catch (Exception $e) {
-    error_log($e->getMessage());
-    http_response_code(400);
-    exit;
-}
-if(!isset($params['image'])) {
-    error_log('userPhotoAdd Error:[image] is not found');
-    http_response_code(400);
-    exit;
-}
-$id = (int)$user['id'];
+    //受信jsonパラメータ
+    $json = isset($_POST['params']) ? $_POST['params'] : '';
+    $params = json_decode($json,true);
 
-//登録可能かチェック
-if($storage->UserPhoto->getUserPhotoCount($id) >= \library\Model_UserPhoto::MAX_COUNT) {
-    error_log('userPhotoAdd Error:max_count over > '.$id);
-    http_response_code(400);
-    exit;
-}
+    //存在チェック
+    $token = isset($params['user_id']) ? $params['user_id'] : null;
+    if(is_null($token)||!isset($params['image'])) {
+        throw new InvalidArgumentException();
+    }
+    $user = $storage->User->getDataFromToken($token);
+    $id = (int)$user['id'];
 
-//クエリ発行
-$storage->beginTransaction();
-try {
+    //登録可能かチェック
+    if($storage->UserPhoto->getUserPhotoCount($id) >= \library\Model_UserPhoto::MAX_COUNT) {
+        throw new BadMethodCallException();
+    }
+    //クエリ発行
+    $storage->beginTransaction();
     //UserPhotoの登録
     $result = $storage->UserPhoto->add($id,$params['image']);
-    
-} catch(\PdoException $e) {
-    error_log($e->getMessage());
-    http_response_code(400);
-    exit;
+    $storage->commit();
+    return \library\Response::success();
 } catch(Exception $e) {
-    error_log($e->getMessage());
-    http_response_code(400);
-    exit;
+    if($storage->isTransaction()) {
+        $storage->rollback();
+    }
+    return \library\Response::error($e);
 }
-if(!$result) {
-    error_log('userPhotoAdd Error：insert failed > '.$udid);
-    http_response_code(400);
-    exit;
-}
-$storage->commit();
-return http_response_code(200);
+
 
 

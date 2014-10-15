@@ -67,7 +67,7 @@ class Model {
     function checkKey($arr)
     {
         if(!is_array($this->_primary_key)) {
-            throw \Exception('呼び出しエラー');
+            throw new \BadMethodCallException();
         }
         $check = true;
         $count = count($this->_primary_key);
@@ -130,38 +130,53 @@ class Model {
      */
     public function primary($ids)
     {
+        $ret = array();
         if(!$ids) {
-            return array();
-        }
-        $query = 'SELECT * FROM ' . $this->_table_name;
-        if(is_array($this->_primary_key)) {
-            //複合主キーの場合
-            list($wheres,$binds) = $this->createCompsiteKeyBinds($ids);
-            $query .= ' WHERE ' . implode(' OR ',$wheres);
-            $stmt = $this->_con->prepare($query);
-            foreach($binds as $key => $params) {
-                $stmt->bindValue($key,$params[0],$params[1]);
-            }
-        } else {
-            //単一主キーの場合
-            $query .= ' WHERE ' . $this->_primary_key . ' IN (' . implode(',',array_fill(0,count($ids),'?')) . ')';
-            $stmt = $this->_con->prepare($query);
-            foreach($ids as $i => $id) {
-                $stmt->bindValue($i+1,$id,$this->_data_types[$this->_primary_key]);
-            }
-        }
-        $stmt->execute();
-        
-        if(!is_array($this->_primary_key)) {
-            $ret = array();
-            while($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
-                $id = $row[$this->_primary_key];
-                $ret[$id] = $row;
-            }
             return $ret;
-        } else {
-            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
         }
+        $ids_ = array();
+        foreach($ids as $id) {
+            if(is_array($this->_primary_key)) {
+                $ids_ = $ids;
+            } else {
+                if(isset($this->_cache[$id])) {
+                    $ret[$id] = $this->_cache[$id];
+                } else {
+                    $ids_[] = $id;
+                }
+            }
+        }
+        $ids = $ids_;
+        if($ids) {
+            $query = 'SELECT * FROM ' . $this->_table_name;
+            if(is_array($this->_primary_key)) {
+                //複合主キーの場合
+                list($wheres,$binds) = $this->createCompsiteKeyBinds($ids);
+                $query .= ' WHERE ' . implode(' OR ',$wheres);
+                $stmt = $this->_con->prepare($query);
+                foreach($binds as $key => $params) {
+                    $stmt->bindValue($key,$params[0],$params[1]);
+                }
+            } else {
+                //単一主キーの場合
+                $query .= ' WHERE ' . $this->_primary_key . ' IN (' . implode(',',array_fill(0,count($ids),'?')) . ')';
+                $stmt = $this->_con->prepare($query);
+                foreach($ids as $i => $id) {
+                    $stmt->bindValue($i+1,$id,$this->_data_types[$this->_primary_key]);
+                }
+            }
+            $stmt->execute();
+
+            if(!is_array($this->_primary_key)) {
+                while($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+                    $id = $row[$this->_primary_key];
+                    $ret[$id] = $this->_cache[$id] = $row;
+                }
+            } else {
+                $ret = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            }
+        }
+        return $ret;
     }
     
     /**
@@ -326,5 +341,29 @@ class Model {
         }
         $sId = $id % $this->_sharding;
         return $this->_table_name . "_" . $sId;
+    }
+    
+    /**
+     * 1以上の整数であることをチェックする
+     * @param type $value
+     * @throws InvalidArgumentException
+     */
+    public function checkInt($value)
+    {
+        $values = func_get_args();
+        if(!$values) {
+            return;
+        }
+        foreach($values as $value) {
+            if(is_array($value)) {
+                foreach($value as $v) {
+                    return $this->checkInt($v);
+                }
+            }
+            if(!is_int($value)||!$value) {
+                throw new \InvalidArgumentException();
+            }
+        }
+        return true;
     }
 }

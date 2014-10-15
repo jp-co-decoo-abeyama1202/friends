@@ -9,13 +9,19 @@ if(isset($_POST['send'])) {
     if($user) {
         //PUSH送信
         $device = $user['device'] == \library\Model_User::DEVICE_IOS ? \library\Push::TYPE_IOS : \library\Push::TYPE_ANDROID;
-        $bool = $push->send(
-            $device,
-            $user['push_id'],
-            $push->message($_POST['message'])
-            ->badge(3)
-            ->sound(null)
-        );
+        try {
+            $bool = $push->send(
+                $device,
+                $user['push_id'],
+                $push->message($_POST['message'])
+                ->badge(3)
+                ->sound(null)
+            );
+        } catch(Exception $e) {
+            error_log($e);
+        }
+    } else {
+        var_dump("userなし");
     }
 }
 ?>

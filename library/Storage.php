@@ -22,6 +22,7 @@ class Storage {
      * @var array
      */
     protected $_models = array();
+    protected $_modelPaths = array();
     protected $_connections = array();
     protected $_transaction = false;
     
@@ -37,7 +38,8 @@ class Storage {
         $db_config = $this->_config->getDbConfig();
         foreach($db_config as $key => $config)
         {
-            $this->createConnection($key);
+            $this->_connections[$key] = null;
+            //$this->createConnection($key);
         }
     }
     
@@ -55,7 +57,7 @@ class Storage {
         }
         $config = $db_config[$key] + Config::$_default_db_config;
         try {
-            $dsn = 'mysql:host='.$config[Config::DB_CONFIG_HOST].';dbname='.$config[Config::DB_CONFIG_DBNAME].';charset='.$config[Config::DB_CONFIG_CHARSET].';unix_socket=/mtmp/mysql.sock';
+            $dsn = $config[Config::DB_DSN];
             $pdo = new \PDO($dsn,$config[Config::DB_CONFIG_USERNAME],$config[Config::DB_CONFIG_PASSWORD],array(\PDO::ATTR_EMULATE_PREPARES => false));
         } catch(PDOException $e) {
             exit('接続失敗:'.$e->getMessage());
@@ -76,6 +78,12 @@ class Storage {
     public function getConnection($key)
     {
         if(array_key_exists($key,$this->_connections)) {
+            if(!$this->_connections[$key]) {
+                $this->createConnection($key);
+                if($this->_transaction && !$this->_connections[$key]->inTransaction()) {
+                    $this->_connections[$key]->beginTransaction();
+                }
+            }
             return $this->_connections[$key];
         }
         return null;
@@ -99,7 +107,8 @@ class Storage {
         }
         foreach($class_list as $variable_name => $class_name){
             if(class_exists($class_name)) {
-                $this->_models[$variable_name] = new $class_name($this);
+                $this->_modelPaths[$variable_name] = $class_name;
+                //$this->_models[$variable_name] = new $class_name($this);
             } else {
                 error_log('notfound:'.$class_name);
             }
@@ -168,7 +177,10 @@ class Storage {
      */
     function __get($name)
     {
-        if(array_key_exists($name,$this->_models)) {
+        if(array_key_exists($name,$this->_modelPaths)) {
+            if(!isset($this->_models[$name])) {
+                $this->_models[$name] = new $this->_modelPaths[$name]($this);
+            }
             return $this->_models[$name];
         }
         throw new \Exception('アクセス権限なし');
@@ -212,9 +224,9 @@ class Storage {
     public function beginTransaction()
     {    
         if($this->_transaction) {
-            throw new Exception('transaction is already started');
+            throw new \Exception('transaction is already started');
         }
-        foreach($this->_connections as $con)
+        foreach($this->_connections as $key => $con)
         {
             if($con) {
                 $con->beginTransaction();
@@ -228,7 +240,7 @@ class Storage {
         if(!$this->_transaction) {
             throw new Exception('transaction is not started');
         }
-        foreach($this->_connections as $con)
+        foreach($this->_connections as $key => $con)
         {
             if($con) {
                 $con->commit();

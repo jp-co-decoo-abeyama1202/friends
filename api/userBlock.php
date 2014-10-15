@@ -13,60 +13,28 @@ if(IS_TEST) {
     $_POST['params'] = json_encode($test_params);
 }
 */
-//json受け取り
-$json = isset($_POST['params']) ? $_POST['params'] : '';
-$params = json_decode($json,true);
-//存在チェック
-$token = isset($params['user_id']) ? $params['user_id'] : null;
-$blocktoken = isset($params['block_id']) ? $params['block_id'] : null;
-$mode = isset($params['mode']) ? $params['mode'] : null;
-if(is_null($token)) {
-    error_log('userBlock Error:必要なパラメータ[user_id]が足りません');
-    http_response_code(400);
-    exit;
-}
-if(is_null($blocktoken)) {
-    error_log('userBlock Error:必要なパラメータ[block_id]が足りません');
-    http_response_code(400);
-    exit;
-}
-if(is_null($mode)||!in_array($mode,\library\Model_UserBlock::$modeList)) {
-    error_log('userBlock Error:必要なパラメータ[mode]が足りません');
-    http_response_code(400);
-    exit;
-}
 try {
+    //json受け取り
+    $json = isset($_POST['params']) ? $_POST['params'] : '';
+    $params = json_decode($json,true);
+    //存在チェック
+    $token = isset($params['user_id']) ? $params['user_id'] : null;
+    $blocktoken = isset($params['block_id']) ? $params['block_id'] : null;
+    $mode = isset($params['mode']) ? $params['mode'] : null;
+    if(is_null($token)||is_null($blocktoken)||is_null($mode)||!in_array($mode,\library\Model_UserBlock::$modeList)) {
+        throw new InvalidArgumentException();
+    }
     $user = $storage->User->getDataFromToken($token);
-    if(!$user) {
-        //存在しないユーザ
-        error_log('userBlock Error：this user is not found > '.$token);
-        http_response_code(400);
-        exit;
-    }
     $block = $storage->User->getDataFromToken($blocktoken);
-    if(!$block) {
-        //存在しないユーザ
-        error_log('userBlock Error：this user is not found > '.$blocktoken);
-        http_response_code(400);
-        exit;
-    }
-} catch (PDOException $ex) {
-    error_log($e->getMessage());
-    http_response_code(400);
-    exit;
-}
-$id = (int)$user['id'];
-$blockId = (int)$block['id'];
-$check = $storage->UserBlock->check($id,$blockId);
-if($mode === \library\Model_UserBlock::MODE_ADD) {
-    //追加
-    if($check) {
-        //追加済み
-        error_log('userBlock Error:already blocked > ' .$id.' -> '.$blockId);
-        exit;
-    }
-    $storage->beginTransaction();
-    try{
+    $id = (int)$user['id'];
+    $blockId = (int)$block['id'];
+    $check = $storage->UserBlock->check($id,$blockId);
+    if($mode === \library\Model_UserBlock::MODE_ADD) {
+        //追加
+        if($check) {
+            return \library\Response::json();
+        }
+        $storage->beginTransaction();
         //ブロック追加
         $storage->UserBlock->add($id,$blockId);
         //ブロッカー追加
@@ -111,31 +79,23 @@ if($mode === \library\Model_UserBlock::MODE_ADD) {
             $storage->UserRequestFrom->add($id, $blockId, $messageId, \library\Model_UserRequestFrom::STATE_CANCELL, \library\Model_UserRequestFrom::DELETE_ON);
             $storage->UserRequestTo->add($blockId, $id, $messageId, \library\Model_UserRequestFrom::STATE_CANCELL, \library\Model_UserRequestFrom::DELETE_ON);
         }
-    } catch (Exception $e) {
-        error_log($e->getMessage());
-        $storage->rollback();
-        http_response_code(400);
-        exit;
-    }
-    $storage->commit();
-} else if($mode === \library\Model_UserBlock::MODE_DEL) {
-    //削除
-    if(!$check) {
-        //登録されていない
-        error_log('userBlock Error:not block > ' .$id.' -> '.$blockId);
-        http_response_code(400);
-        exit;
-    }
-    $storage->beginTransaction();
-    try{
+        $storage->commit();
+    } else if($mode === \library\Model_UserBlock::MODE_DEL) {
+        //削除
+        if(!$check) {
+            //登録されていない
+            throw new BadMethodCallException();
+        }
+        $storage->beginTransaction();
         $storage->UserBlock->delete($id,$blockId);
         $storage->UserBlocker->delete($blockId,$id);
-    } catch (Exception $e) {
-        error_log($e->getMessage());
-        $storage->rollback();
-        http_response_code(400);
-        exit;
+        $storage->commit();
     }
-    $storage->commit();
+    return \library\Response::success();
+} catch(Exception $e) {
+    if($storage->isTransaction()) {
+        $storage->rollback();
+    }
+    return \library\Response::error($e);
 }
-return http_response_code(200);
+

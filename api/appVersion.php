@@ -8,8 +8,4 @@
  * Time: 18:34
  */
 require('../inc/define.php');
-$appVersion = array('version'=>NOW_VERSION);
-
-$json = json_encode($appVersion);
-echo $json;
-return http_response_code(200);
+return \library\Response::json();

@@ -45,6 +45,7 @@ function ApnsPHP_Autoload($sClassName)
 		$sPath, DIRECTORY_SEPARATOR,
 		str_replace('_', DIRECTORY_SEPARATOR, $sClassName)
 	);
+
 	if (!is_file($sFile) || !is_readable($sFile)) {
 		throw new Exception("Class file '{$sFile}' does not exists");
 	}

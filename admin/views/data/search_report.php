@@ -86,7 +86,7 @@ $list = $storage->Report->search($values);
                     </div><!-- /.box-header -->
                     <?php if(!$list):?>
                     <div class="box-body">
-                        <div class="alert alert-danger alert-dismissable">
+                        <div class="alert alert-danger alert-dismissable" style="margin-top:20px;">
                             <i class="fa fa-ban"></i>
                             <b>該当する違反報告がありません</b>
                         </div>

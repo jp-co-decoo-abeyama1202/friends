@@ -107,6 +107,62 @@ class Model_User extends Model {
     }
     
     /**
+     * primary_keyを元にレコード1件取得
+     * @param type $id
+     * @return null
+     */
+    public function primaryApiOne($id)
+    {
+        $ret = $this->primaryApi(array($id));
+        if(!empty($ret)) {
+            return current($ret);
+        }
+        return null;
+    }
+    
+    /**
+     * primary_keyを元にレコードを取得
+     * @param type $ids
+     * @return type
+     */
+    public function primaryApi($ids)
+    {
+        if(!$ids) {
+            return array();
+        }
+        $query = 'SELECT user.id as user_id,token as id,name,sex,age,country,area,request,publishing,profile,device,state,image,login_time FROM ' . $this->_table_name;
+        $query.= ' LEFT JOIN user_token ON user.id = user_token.id';
+        $query .= ' WHERE ' .$this->_table_name . '.' . $this->_primary_key . ' IN (' . implode(',',$ids) . ')';
+        $stmt = $this->_con->prepare($query);
+        $stmt->execute();
+        $ret = array();
+        while($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+            $id = $row['user_id'];
+            unset($row['user_id']);
+            $ret[$id] = $row;
+        }
+        $bans = $this->_storage->UserBan->primary(array_keys($ret));
+        $removes = array();
+        $now = time();
+        foreach($bans as $id => $ban) {
+            $available = (int)$ban['available'];
+            if($available === Model_UserBan::AVAILABLE_FALSE) {
+                $removes[] = $id;
+                continue;
+            }
+            $end = (int)$ban['end_time'];
+            if($end && $end < $now) {
+                $removes[] = $id;
+                continue;
+            }
+            //削除状態にする
+            $ret[$id]['state'] = self::STATE_INVALID;
+        }
+        $this->_storage->UserBan->removes($removes);
+        return $ret;
+    }
+    
+    /**
      * udidからユーザデータを取得する
      * @param string $udid
      * @return Array|null
@@ -118,25 +174,42 @@ class Model_User extends Model {
         $stmt->bindValue(':udid',$udid,$this->_data_types['udid']);
         $stmt->execute();
         $id = (int)$stmt->fetchColumn();
-        if($id) {
-            return $this->primaryOne($id);
+        if(!$id) {
+            return null;
         }
-        return null;
+        return $this->primaryOne($id);
     }
     
     /**
      * tokenからユーザデータを取得する
      */
-    public function getDataFromToken($token)
+    public function getDataFromToken($token,$orFail=true)
     {
-        if(!$token) {
-            throw new \InvalidArgumentException();
-        }
         $userId = $this->_storage->UserToken->getIdFromToken($token);
-        if($userId) {
-            return $this->primaryOne($userId);
+        if(!$userId) {
+            if($orFail) {
+                throw new \OutOfBoundsException();   
+            } else {
+                return null;
+            }
         }
-        return null;
+        return $this->primaryOne($userId);
+    }
+    
+    /**
+     * ログイン状態のユーザでアクセスしているかチェックする。
+     * @param type $token
+     * @return type
+     * @throws LoginFailedException
+     */
+    public function getLoginUser($token)
+    {
+        $user = $this->getDataFromToken($token);
+        $id = (int)$user['id'];    
+        if($id !== $_SESSION['id']) {
+            throw new LoginFailedException();
+        }
+        return $user;
     }
     
     /**
@@ -144,10 +217,11 @@ class Model_User extends Model {
      * @param int $userId 
      * @param int $offset = 0
      * @param int $count = 30
-     * @param bool $addBlocker ブロックされてる人も含めるか
-     * @param bool $addFriend フレンドも含めるか
+     * @param bool $removeBlocker ブロックされてる人も含めるか
+     * @param bool $removeFriend フレンドも含めるか
+     * @param bool $removeRefuse 拒否ユーザを含めるか
      */
-    public function search($userId,$offset = 0,$count = self::SEARCH_DEFAULT,$addBlocker=false,$addFriend=false)
+    public function search($userId,$offset = 0,$count = self::SEARCH_DEFAULT,$removeBlocker=true,$removeFriend=false)
     {
         $userId = (int)$userId;
         $option = $this->_storage->UserOption->primaryOne($userId);
@@ -177,18 +251,25 @@ class Model_User extends Model {
             $where[] = 'area=:area';
 
         }
-        if(!$addBlocker) {
+        if($removeBlocker) {
             //ブロックされているユーザを除外
             $blockerIds = $this->_storage->UserBlocker->getBlockerIds($userId);
             if($blockerIds) {
                 $where[] = 'user.id NOT IN ('.implode(',',$blockerIds).')';
             }
         }
-        if(!$addFriend) {
+        if($option['view_friend'] == Model_UserOption::FLAG_OFF) {
             //フレンドを除外
             $friendIds = $this->_storage->UserFriend->getFriendsIds($userId);
             if($friendIds) {
                 $where[] = 'user.id NOT IN ('.implode(',',$friendIds).')';
+            }
+        }
+        if($option['view_refuse'] == Model_UserOption::FLAG_OFF) {
+            //申請拒否ユーザを除外
+            $refuseIds = $this->_storage->UserRequestTo->getRequestUserIds($userId,Model_UserRequest::STATE_EXECUTE);
+            if($refuseIds) {
+                $where[] = 'user.id NOT IN ('.implode(',',$refuseIds).')';
             }
         }
         $binds[':user_id'] = $userId;
@@ -200,7 +281,6 @@ class Model_User extends Model {
         }
         $sql.= ' ORDER BY login_time DESC';
         $sql.= ' LIMIT ' . $offset . ' , ' .$count;
-        
         $stmt = $this->_con->prepare($sql);
         foreach($binds as $key => $value) {
             $stmt->bindValue($key,$value);
@@ -221,6 +301,10 @@ class Model_User extends Model {
      */
     public function getDataFromRequestList($ids)
     {
+        if(!$ids) {
+            return array();
+        }
+        
         $sql = 'SELECT user.id as user_id,token as id,name,sex,age,country,area,request,publishing,profile,device,state,image,login_time FROM user';
         $sql.= ' LEFT JOIN user_token ON user.id = user_token.id';
         $sql.= ' WHERE user.id IN ('.implode(',',$ids).')';
@@ -234,6 +318,41 @@ class Model_User extends Model {
             $ret[$userId] = $l;
         }
         return $ret;
+    }
+    
+    public function updateLogintime($id)
+    {
+        if(!$id) {
+            return false;
+        }
+        $values = array(
+            'login_time' => time(),
+            'update_time' => time(),
+        );
+        return $this->updatePrimaryOne($values, $id);      
+    }
+    /**
+     * ログイン処理
+     * @param int $userId
+     * @param string $pushId
+     * @return bool
+     * @throws \InvalidArgumentException
+     */
+    public function login($userId,$pushId=null)
+    {
+        if(!is_int($userId)||!$userId) {
+            throw new \InvalidArgumentException();
+        }
+        if(is_null($pushId)) {
+            $pushId = "";
+        }
+        $values = array(
+            'push_id' => $pushId,
+            'update_time' => time(),
+        );
+        //セッションに登録
+        $_SESSION['id'] = $userId;
+        return $this->updatePrimaryOne($values, $userId);
     }
 }
 

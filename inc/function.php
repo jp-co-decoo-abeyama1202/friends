@@ -20,3 +20,43 @@ function getKeyValues($keys,$values,$head="")
     }
     return $ret;
 }
+
+/**
+ * フレンド用ソート用関数
+ * 最近ログインしたユーザを上
+ * ログイン時間が同じなら、
+ * 最近フレンドになったユーザが上
+ * @param type $a
+ * @param type $b
+ * @return int
+ */
+function friendsort($a,$b) {
+    if($a['login_time'] === $b['login_time']) {
+        if($a['create_time'] === $b['create_time']) {
+            return 0;
+        }
+        return $a['create_time'] > $b['create_time'] ? -1 : 1;
+    }
+    return $a['login_time'] > $b['login_time'] ? -1 : 1;
+}
+
+function groupsort($a,$b) {
+    return $a['join_time'] > $b['join_time'] ? -1 : 1;
+}
+
+/**
+ * トークタブ用ソート関数
+ */
+function newlistsort($a,$b)
+{
+    return $a['update_time'] > $b['update_time'] ? -1 : 1;
+}
+
+/**
+ * 
+ */
+function groupUserSort($a,$b)
+{
+    return $a['create_time'] < $b['create_time'] ? -1 : 1;
+}
+

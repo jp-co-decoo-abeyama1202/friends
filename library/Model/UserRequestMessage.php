@@ -96,7 +96,7 @@ class Model_UserRequestMessage extends ShardingModel {
         $result = $stmt->execute();
         $id = 0;
         if($result) {
-            $id = $this->lastInsertId();
+            $id = (int)$this->lastInsertId();
         }
         return $id;
     }

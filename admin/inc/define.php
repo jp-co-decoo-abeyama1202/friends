@@ -5,12 +5,14 @@
  */
 //定数読み込み
 require_once('/home/homepage/html/public/friends/inc/const.php');
-session_start();
 
 if($_SERVER["SERVER_ADDR"]===ADDR_TEST){
     //テストサーバ
     define('DIR_CONFIG','/home/homepage/html/public/friends/config/test');
     define('ADDR',ADDR_TEST);
+}elseif($_SERVER["SERVER_ADDR"]===ADDR_LOCAL) {
+    define('DIR_CONFIG','/home/homepage/html/public/friends/config/local');
+    define('ADDR',ADDR_LOCAL);
 }else{
     define('DIR_CONFIG','/home/homepage/html/public/friends/config');
     define('ADDR',ADDR_PRODUCTION);
@@ -31,6 +33,11 @@ if (!$autoloader->isEnabled()) {
     $autoloader->addDirectory(DIR_LIBRARY,'library');
     $autoloader->enable();
 }
+
+require_once(DIR_LIBRARY . '/HTML/Emoji.php');
+$emoji = HTML_Emoji::getInstance();
+$emoji->setImageUrl('http:///friends/assets/img/emoji/');
+
 require_once(DIR_LIBRARY . '/Assets.php');
 $url = 'http://' . ADDR . '/friends/admin/';
 $assets = array(
@@ -53,6 +60,10 @@ $assets = array(
     'api'  => array(
         'path' => '/home/homepage/html/public/friends/admin/api/',
         'uri'  => $url . 'api/',
+    ),
+    'test_api'  => array(
+        'path' => '/home/homepage/html/public/friends/api/',
+        'uri'  => 'http://'. ADDR . '/friends/api/',
     )
 );
 \library\Assets::set($assets);

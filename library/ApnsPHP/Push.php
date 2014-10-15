@@ -170,8 +170,7 @@ class ApnsPHP_Push extends ApnsPHP_Abstract
 
 				$nLen = strlen($aMessage['BINARY_NOTIFICATION']);
 				$this->_log("STATUS: Sending message ID {$k} {$sCustomIdentifier} (" . ($nErrors + 1) . "/{$this->_nSendRetryTimes}): {$nLen} bytes.");
-
-				$aErrorMessage = null;
+                                $aErrorMessage = null;
 				if ($nLen !== ($nWritten = (int)@fwrite($this->_hSocket, $aMessage['BINARY_NOTIFICATION']))) {
 					$aErrorMessage = array(
 						'identifier' => $k,

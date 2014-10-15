@@ -12,17 +12,13 @@ namespace library;
 class Config {
     
     const DEFAULT_DB = 'default';
-    const DB_CONFIG_DBNAME   = 'db_name';
-    const DB_CONFIG_HOST     = 'host';
     const DB_CONFIG_USERNAME = 'user_name';
     const DB_CONFIG_PASSWORD = 'password';
-    const DB_CONFIG_CHARSET  = 'charset';
+    const DB_DSN = '';
     public static $_default_db_config = array(
-        self::DB_CONFIG_DBNAME => '',
-        self::DB_CONFIG_HOST => '',
         self::DB_CONFIG_USERNAME => '',
         self::DB_CONFIG_PASSWORD => '',
-        self::DB_CONFIG_CHARSET => 'utf8'
+        self::DB_DSN => '',
     );
     protected $_db_config = null;
     protected $_table_config = array();

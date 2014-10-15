@@ -12,70 +12,34 @@ if(IS_TEST) {
     $_POST['params'] = json_encode($test_params);
 }
 */
-//受信jsonパラメータ
-$json = isset($_POST['params']) ? $_POST['params'] : '';
-$params = json_decode($json,true);
+    try {
+    //受信jsonパラメータ
+    $json = isset($_POST['params']) ? $_POST['params'] : '';
+    $params = json_decode($json,true);
 
-//存在チェック
-$token = isset($params['user_id']) ? $params['user_id'] : null;
-if(is_null($token)) {
-    error_log('userImageAdd Error:[$token] is not found');
-    http_response_code(400);
-    exit;
-}
-try {
-    $userId = $storage->UserToken->getIdFromToken($token);
-    if(!$userId) {
-        //存在しないユーザ
-        error_log('userImageAdd Error：this user is not found > '.$token);
-        http_response_code(400);
-        exit;
+    //存在チェック
+    $token = isset($params['user_id']) ? $params['user_id'] : null;
+    if(is_null($token)||!isset($params['image'])) {
+        throw new InvalidArgumentException();
     }
-    $user = $storage->User->primaryOne($userId);
-    if(!$user) {
-        //存在しないユーザ
-        error_log('userImageAdd Error：this user is not found > '.$userId);
-        http_response_code(400);
-        exit;
-    }
-} catch (Exception $ex) {
-    error_log($ex->getMessage());
-    http_response_code(400);
-    exit;
-}
-if(!isset($params['image'])) {
-    error_log('userImageAdd Error:[image] is not found');
-    http_response_code(400);
-    exit;
-}
-
-$id = (int)$user['id'];
-
-//クエリ発行
-$storage->beginTransaction();
-try {
+    $user = $storage->User->getDataFromToken($token);
+    $id = (int)$user['id'];
+    //クエリ発行
+    $storage->beginTransaction();
     $values = array(
         'image' => $params['image'],
         'update_time' => time(),
     );
     //Userの更新
     $result = $storage->User->updatePrimaryOne($values,$id);
-    
-} catch(\PdoException $e) {
-    error_log($e->getMessage());
-    http_response_code(400);
-    exit;
+    $storage->commit();
+    return \library\Response::success();
 } catch(Exception $e) {
-    error_log($e->getMessage());
-    http_response_code(400);
-    exit;
+    if($storage->isTransaction()) {
+        $storage->rollback();
+    }
+    return \library\Response::error($e);
 }
-if(!$result) {
-    error_log('userImageAdd Error：update failed > '.$id);
-    http_response_code(400);
-    exit;
-}
-$storage->commit();
-return http_response_code(200);
+
 
 

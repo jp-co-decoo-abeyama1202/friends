@@ -1,4 +1,5 @@
 <?php
+session_start();
 /**
  * 各ファイルから読み込まれるファイル
  * 基本設定等は全部ココが基準
@@ -9,6 +10,9 @@ require_once('/home/homepage/html/public/friends/inc/const.php');
 if($_SERVER["SERVER_ADDR"]===ADDR_TEST){
     //テストサーバ
     define('DIR_CONFIG','/home/homepage/html/public/friends/config/test');
+}else if($_SERVER["SERVER_ADDR"]===ADDR_LOCAL){
+    //ローカルサーバ
+    define('DIR_CONFIG','/home/homepage/html/public/friends/config/local');
 }else{
     define('DIR_CONFIG','/home/homepage/html/public/friends/config');
 }
@@ -20,6 +24,9 @@ if (!$autoloader->isEnabled()) {
     $autoloader->addDirectory(DIR_LIBRARY,'library');
     $autoloader->enable();
 }
+require_once(DIR_LIBRARY . '/HTML/Emoji.php');
+$emoji = HTML_Emoji::getInstance();
+
 require_once(DIR_CONFIG  . '/config.php');
 $config_data = array(
     'db_config'    => $_db_config,
@@ -30,9 +37,17 @@ $config_data = array(
         'instances' => array('iphone')
     ),
 );
-
+/**
+ * @var \library\Config
+ */
 $config = new \library\Config($config_data);
+/**
+ * @var \library\Storage
+ */
 $storage = new \library\Storage($config);
+/**
+ * @var \library\Push
+ */
 $push = new \library\Push($_push_config);
 
 /*

@@ -38,6 +38,7 @@ if($friendsId) {
 }
 foreach($messages as $id => $message) {
     $w = array();
+    $w[] = $message['id'];
     if($message['sender_id'] == $userId) {
         $w[] = array(
             'params' => 'style="background-color:yellow;font-weight:bold;"',
@@ -57,6 +58,11 @@ foreach($messages as $id => $message) {
         'escape' => false,
         'value' => icon($message['read_flag'],'read_flag'),
     );
+    $w[] = array(
+        'params' => 'style="text-align:center;"',
+        'escape' => false,
+        'value' => icon($message['delete_flag'],'delete_flag'),
+    );
     $w[] = date('y/m/d H:i:s',$message['create_time']);
     $w[] = $message['create_time'] == $message['update_time'] ? '-' :date('y/m/d H:i:s',$message['update_time']);
     $messageTableData[] = $w;
@@ -66,7 +72,7 @@ $messageTableContents = array(
     'table_id' => 'message_list',
     'table_icon' => 'ion ion-ios7-chatboxes-outline',
     'table_title' => '会話ログ',
-    'table_header' => array('送信側','受信側','メッセージ','既読','送信日時','既読日時'),
+    'table_header' => array('mid','送信側','受信側','メッセージ','既読','状態','送信日時','既読日時'),
     'table_data' => $messageTableData,
     'error_message' => '会話ログが1件もありません',
 );

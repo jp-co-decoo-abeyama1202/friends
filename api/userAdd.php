@@ -22,81 +22,81 @@ if(IS_TEST) {
     $_POST['params'] = json_encode($test_params);
 }
 */
-//受信jsonパラメータ
-$json = isset($_POST['params']) ? $_POST['params'] : '';
-$params = json_decode($json,true);
-
-//jsonデータのうち、必要なデータのキー
-$list = array(
-    'udid','name','sex','age','country','area','push_id','device'
-);
-
-//重複チェック
-$udid = isset($params['udid']) ? $params['udid'] : null;
-if(is_null($udid)) {
-    error_log('userAddError:[udid] is not found');
-    http_response_code(400);
-    exit;
-}
-
 try {
+    //受信jsonパラメータ
+    $json = isset($_POST['params']) ? $_POST['params'] : '';
+    $params = json_decode($json,true);
+
+    //jsonデータのうち、必要なデータのキー
+    $list = array(
+        'udid','name','sex','age','country','area','push_id','device'
+    );
+
+    //重複チェック
+    $udid = isset($params['udid']) ? $params['udid'] : null;
+    if(is_null($udid)) {
+        throw new InvalidArgumentException();
+    }
+
     //udidからデータ取得
     $user = $storage->User->getDataFromUdid($udid);
     if($user) {
         //登録済みユーザ
+        if($user['state'] == \library\Model_User::STATE_INVALID) {
+            $storage->beginTransaction();
+            $now = time();
+            $values = array(
+                'state' => \library\Model_User::STATE_VALID,
+                'login_time' => $now,
+                'update_time' => $now,
+            );
+            $result1 = $storage->User->updatePrimaryOne($values,$user['id']);
+            $storage->commit();
+        }
         $token = $storage->UserToken->getToken((int)$user['id']);
-        echo json_encode(array('status'=>\library\Model_User::ADD_DUPLICATE,'user_id'=>$token));
-        http_response_code(200);
-        exit;
+        return \library\Response::json(array('status'=>\library\Model_User::ADD_DUPLICATE,'user_id'=>$token));
     }
-} catch (PDOException $ex) {
-    error_log($e->getMessage());
-    http_response_code(400);
-    exit;
-}
-//INSERT
-$now = time();
-$keys = array(
-    'udid', 'name', 'sex', 'age', 'country', 'area', 'push_id', 'device', 'login_time', 'create_time', 'update_time'
-);
-$values = array();
-foreach($keys as $key) {
-    $value = isset($params[$key]) ? $params[$key] : null;
-    if(!is_null($value)) {
-        $values[$key] = $value;
-    } else if(in_array($key,array('login_time','create_time','update_time'))) {
-        //登録時間、更新時間、ログイン時間
-        $values[$key] = $now;
-    } else {
-        error_log('userAddError:必要なパラメータ['.$key.']が足りません');
-        http_response_code(400);
-        exit;
+    //INSERT
+    $now = time();
+    $keys = array(
+        'udid', 'name', 'sex', 'age', 'country', 'area', 'push_id', 'device', 'login_time', 'create_time', 'update_time'
+    );
+    $values = array();
+    foreach($keys as $key) {
+        $value = isset($params[$key]) ? $params[$key] : null;
+        if(!is_null($value)) {
+            $values[$key] = $value;
+        } else if(in_array($key,array('login_time','create_time','update_time'))) {
+            //登録時間、更新時間、ログイン時間
+            $values[$key] = $now;
+        } else if(in_array($key,array('push_id'))) {
+            $values[$key] = '';
+        } else {
+            throw new InvalidArgumentException();
+        }
     }
-}
 
-//user_optionを登録
-$sex = $params['sex'];
-//逆の性別をセット
-if($sex == \library\Model_User::SEX_MAN) {
-    $sex = \library\Model_User::SEX_WOMAN;
-} else if($sex == \library\Model_User::SEX_WOMAN) {
-    $sex = \library\Model_User::SEX_MAN;
-}
-$options = array(
-    'sex' => $sex,
-    'min_age' => \library\Model_User::AGE_ALL,
-    'max_age' => \library\Model_User::AGE_ALL,
-    'country' => $params['country'],
-    'area' => \library\Model_User::AREA_ALL,
-    'push_friend' => \library\Model_UserOption::FLAG_ON,
-    'push_chat' => \library\Model_UserOption::FLAG_ON,
-    'update_time' => $now,
-);
-
-//クエリ発行
-$storage->beginTransaction();
-try {
-    $storage->User->insertOne($values);
+    //user_optionを登録
+    $sex = $params['sex'];
+    //逆の性別をセット
+    if($sex == \library\Model_User::SEX_MAN) {
+        $sex = \library\Model_User::SEX_WOMAN;
+    } else if($sex == \library\Model_User::SEX_WOMAN) {
+        $sex = \library\Model_User::SEX_MAN;
+    }
+    $options = array(
+        'sex' => $sex,
+        'min_age' => \library\Model_User::AGE_ALL,
+        'max_age' => \library\Model_User::AGE_ALL,
+        'country' => $params['country'],
+        'area' => \library\Model_User::AREA_ALL,
+        'push_friend' => $params['push_id'] ? \library\Model_UserOption::FLAG_ON : \library\Model_UserOption::FLAG_OFF,
+        'push_chat' => $params['push_id'] ? \library\Model_UserOption::FLAG_ON : \library\Model_UserOption::FLAG_OFF,
+        'update_time' => $now,
+    );
+    //クエリ発行
+    $storage->beginTransaction();
+    $storage->User->insertOne($values);    
     $userId = (int)$storage->User->lastInsertId();
     if(!$userId) {
         throw new InvalidArgumentException();
@@ -106,13 +106,11 @@ try {
     $storage->UserOption->insertOne($options);
     //tokenを登録
     $token = $storage->UserToken->create($userId);
+    $storage->commit();
+    return \library\Response::json(array('status'=>\library\Model_User::ADD_SUCCESS,'user_id'=>$token));
 } catch (Exception $e) {
-    error_log($e->getMessage());
-    http_response_code(400);
-    $storage->rollBack();
-    exit;
+    if($storage->isTransaction()) {
+        $storage->rollback();
+    }
+    return \library\Response::error($e);
 }
-
-$storage->commit();
-echo json_encode(array('status'=>\library\Model_User::ADD_SUCCESS,'user_id'=>$token));
-return http_response_code(200);

@@ -1,15 +1,14 @@
 <?php
 
 /**
- * Description of Test
- *
+ * 申請された内容
  * @author Administrafrom_idr
  */
 namespace library;
-class Model_UserRequestTo extends Model_UserRequestFrom {
+class Model_UserRequestTo extends Model_UserRequest {
     
     protected $_table_name = 'user_request_to';
-    protected $_primary_key = array('user_id','tho_id');
+    protected $_primary_key = array('user_id','from_id');
     protected $_data_types = array(
         'user_id'   => \PDO::PARAM_INT,
         'from_id'  => \PDO::PARAM_INT,
@@ -21,25 +20,11 @@ class Model_UserRequestTo extends Model_UserRequestFrom {
     );
     protected $_sharding = 50;
     protected $_sharding_key = 'user_id';
-
+    public static $_targetUserIdColumn = "from_id";
     
-    public function get($userId,$from_id)
-    {
-        $userId = (int)$userId;
-        $from_id = (int)$from_id;
-        if(!$userId||!$from_id) {
-            throw new \InvalidArgumentException();
-        }
-        list($ids,$tableName) = $this->getTableName($userId);
-        $sql = 'SELECT * FROM ' . $tableName . ' WHERE user_id = :user_id AND from_id = :from_id';
-        $stmt = $this->_con->prepare($sql);
-        $stmt->bindValue(':user_id',$userId,$this->_data_types['user_id']);
-        $stmt->bindValue(':from_id',$from_id,$this->_data_types['from_id']);
-        $stmt->execute();
-        return $stmt->fetch(\PDO::FETCH_ASSOC);
-    }
     
-/**
+    
+    /**
      * 受信状況一覧を取得する
      * @param type $userId
      * @throws \InvalidArgumentException
@@ -63,6 +48,11 @@ class Model_UserRequestTo extends Model_UserRequestFrom {
         $messageList = array();
         $list_ = array();
         
+        $allCount = count($list);
+        if($allCount > $offset + $count) {
+            $list = array_slice($list,$offset*$count,$count);
+        }
+        
         foreach($list as $l) {
             $userIds[] = (int)$l['from_id'];
             $messageList[(int)$l['from_id']] = (int)$l['message_id'];
@@ -78,10 +68,10 @@ class Model_UserRequestTo extends Model_UserRequestFrom {
             unset($l['message_id']);
             $list_[] = $l;
         }
-        return $list_;
+        return array($list_,$allCount);
     }
     
-    public function getRequestTos($userId)
+    public function getRequests($userId)
     {
         $userId = (int)$userId;
         if(!$userId) {
@@ -95,87 +85,13 @@ class Model_UserRequestTo extends Model_UserRequestFrom {
         $stmt->execute();
         $list = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         
+        $tColumn = static::$_targetUserIdColumn;
         $ret = array();
         foreach($list as $row) {
-            $id = (int)$row['from_id'];
+            $id = (int)$row[$tColumn];
             $ret[$id] = $row;
         }
         return $ret;
-    }
-    
-    public function getRequestToIds($userId)
-    {
-        return array_keys($this->getRequestTos($userId));
-    }
-    
-    /**
-     * リクエストを登録する。
-     * ON DUPLICATE KEYでやる
-     * @param type $userId
-     * @param type $from_id
-     * @param type $messageId
-     * @param type $state
-     * @return type
-     * @throws \InvalidArgumentException
-     */
-    public function add($userId,$from_id,$messageId,$state,$deleteFlag=self::DELETE_OFF)
-    {
-        if(!$userId||!$messageId||!$from_id) {
-            throw new \InvalidArgumentException();
-        }
-        if(!in_array($deleteFlag,array(self::DELETE_OFF,self::DELETE_ON))) {
-            throw new \InvalidArgumentException();
-        }
-        list($ids,$tableName) = $this->getTableName($userId);
-        $sql = 'INSERT INTO ' . $tableName . ' (user_id,from_id,message_id,state,create_time,update_time,delete_flag) VALUES (:user_id,:from_id,:message_id,:state,:create_time,:update_time,:delete_flag)';
-        $sql.= ' ON DUPLICATE KEY UPDATE state=VALUES(state),delete_flag=VALUES(delete_flag),update_time=VALUES(update_time)';
-        $stmt = $this->_con->prepare($sql);
-        $stmt->bindValue(':user_id',$userId,$this->_data_types['user_id']);
-        $stmt->bindValue(':from_id',$from_id,$this->_data_types['from_id']);
-        $stmt->bindValue(':message_id',$messageId,$this->_data_types['message_id']);
-        $stmt->bindValue(':state',$state,$this->_data_types['state']);
-        $stmt->bindValue(':create_time',time(),$this->_data_types['create_time']);
-        $stmt->bindValue(':update_time',time(),$this->_data_types['update_time']);
-        $stmt->bindValue(':delete_flag',$deleteFlag,$this->_data_types['delete_flag']);
-        return $stmt->execute();
-    }
-    
-    public function update($userId,$from_id,$state)
-    {
-        if(!$userId||!$from_id) {
-            throw new \InvalidArgumentException();
-        }
-        list($ids,$tableName) = $this->getTableName($userId);
-        $sql = 'UPDATE ' . $tableName . ' SET state = :state, update_time = :update_time WHERE user_id = :user_id AND from_id = :from_id';
-        $stmt = $this->_con->prepare($sql);
-        $stmt->bindValue(':user_id',$userId,$this->_data_types['user_id']);
-        $stmt->bindValue(':from_id',$from_id,$this->_data_types['from_id']);
-        $stmt->bindValue(':state',$state,$this->_data_types['state']);
-        $stmt->bindValue(':update_time',time(),$this->_data_types['update_time']);
-        return $stmt->execute();
-    }
-    
-    /**
-     * 申請情報を削除する(論理削除)
-     * @param type $userId
-     * @param type $friendId
-     * @return type
-     * @throws \InvalidArgumentException
-     */
-    public function delete($userId,$from_id)
-    {
-        $userId = (int)$userId;
-        $from_id = (int)$from_id;
-        if(!$userId||!$from_id) {
-            throw new \InvalidArgumentException();
-        }
-        list($ids,$tableName) = $this->getTableName($userId);
-        $sql = 'UPDATE ' . $tableName . ' SET delete_flag = :delete_flag WHERE user_id = :user_id AND from_id = :from_id';
-        $stmt = $this->_con->prepare($sql);
-        $stmt->bindValue(':user_id',$userId,$this->_data_types['user_id']);
-        $stmt->bindValue(':from_id',$from_id,$this->_data_types['from_id']);
-        $stmt->bindValue(':delete_flag',self::DELETE_ON,$this->_data_types['delete_flag']);
-        return $stmt->execute();
     }
 }
 

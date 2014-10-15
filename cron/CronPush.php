@@ -11,13 +11,10 @@
  *
  * @author admin-97
  */
-class Cron_Test extends \library\Cron
+class CronPush extends \library\Cron
 {
     public function run($args = array())
     {
-        $user = $this->_storage->User->primaryOne(4);
-        foreach($user as $key => $v) {
-            echo $key . ":" . $v."\n";
-        }
+        $this->_storage->PushQueue->send();
     }
 }

@@ -351,12 +351,12 @@ class Model_User extends \library\Model_User {
         //申請状況チェック
         $relation = self::RELATION_NONE;
         $requestFrom = $this->_storage->UserRequestFrom->get($userId,$friendId);
-        $requestTo = $this->_storage->UserRequestTo->get($friendId,$userId);
+        $requestTo = $this->_storage->UserRequestTo->get($userId,$friendId);
         if($requestFrom) {
             //自分から申請してる
             if($requestFrom['state'] == \library\Model_UserRequestFrom::STATE_REFUSE) {
                 //相手が拒否してる
-                return self::RELATION_REFUSE_TO;
+                $relation = self::RELATION_REFUSE_TO;
             }
             if($requestFrom['state'] == \library\Model_UserRequestFrom::STATE_PENDING) {
                 //自分からは申請中

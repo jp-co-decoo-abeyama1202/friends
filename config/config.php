@@ -13,16 +13,24 @@ const PEM_PATH = '';
  */
 $_db_config =  array(
     'default' => array(
-        \library\Config::DB_CONFIG_DBNAME   => 'friend',
-        \library\Config::DB_CONFIG_HOST     => 'localhost',
         \library\Config::DB_CONFIG_USERNAME => 'root',
         \library\Config::DB_CONFIG_PASSWORD => 'Vao5yBkpgkoRbEk0d9BDaMQU9bHeay1w',
+        \library\Config::DB_DSN => 'mysql:host=localhost;dbname=friends;charset=utf8mb4;unix_socket=/mtmp/mysql.sock',
     ),
     'statistics' => array(
-        \library\Config::DB_CONFIG_DBNAME   => 'friends_admin',
-        \library\Config::DB_CONFIG_HOST     => 'localhost',
         \library\Config::DB_CONFIG_USERNAME => 'root',
         \library\Config::DB_CONFIG_PASSWORD => 'Vao5yBkpgkoRbEk0d9BDaMQU9bHeay1w',
+        \library\Config::DB_DSN => 'mysql:host=localhost;dbname=friends_statistics;charset=utf8mb4;unix_socket=/mtmp/mysql.sock',
+    ),
+    'user_request' => array(
+        \library\Config::DB_CONFIG_USERNAME => 'root',
+        \library\Config::DB_CONFIG_PASSWORD => 'Vao5yBkpgkoRbEk0d9BDaMQU9bHeay1w',
+        \library\Config::DB_DSN => 'mysql:host=localhost;dbname=friends_user_request;charset=utf8mb4;unix_socket=/mtmp/mysql.sock',
+    ),
+    'user_message' => array(
+        \library\Config::DB_CONFIG_USERNAME => 'root',
+        \library\Config::DB_CONFIG_PASSWORD => 'Vao5yBkpgkoRbEk0d9BDaMQU9bHeay1w',
+        \library\Config::DB_DSN => 'mysql:host=localhost;dbname=friends_user_message;charset=utf8mb4;unix_socket=/mtmp/mysql.sock',
     ),
 );
 /**
@@ -34,9 +42,13 @@ $_db_config =  array(
  */
 $_table_config = array(
     'uu_daily' => 'statistics',
-    'user_memo' => 'admin',
-    'user_ban' => 'admin',
-    'user_ban_history' => 'admin',
+    'push' => 'statistics',
+    'message' => 'user_message',
+    'group_message' => 'user_message',
+    'group_message_read' => 'user_message',
+    'user_request_from' => 'user_request',
+    'user_request_to' => 'user_request',
+    'user_request_message' => 'user_request',
 );
 /**
  * PUSHを送信する為に必要な情報

@@ -141,13 +141,11 @@ class HTML_Emoji
             $class    = 'HTML_Emoji_' . ucfirst($carrier);
             $dirname  = substr(__FILE__, 0, -4);
             $filename = $dirname . '/' . ucfirst($carrier) . '.php';
-
             require_once $filename;
             $instance = new $class;
             $instance->_carrier  = $carrier;
             $instances[$carrier] = $instance;
         }
-
         return $instances[$carrier];
     }
 
@@ -254,6 +252,9 @@ class HTML_Emoji
     {
         $pattern  = $this->_regexOthers;
         $callback = array($this, '_convertCharacter');
+        if(preg_match($pattern,$text)) {
+            error_log("match");
+        }
         return preg_replace_callback($pattern, $callback, $text);
     }
 
@@ -441,7 +442,6 @@ class HTML_Emoji
         if (isset($this->_translationTable) === false) {
             $this->_initTranslationTable();
         }
-
         $utf8 = $matches[0];
         if (isset($this->_translationTable[$utf8]) === true) {
             $alt = $this->_translationTable[$utf8];
@@ -457,7 +457,6 @@ class HTML_Emoji
                     }
                 }
             }
-
             return $alt;
         } else {
             return $utf8;

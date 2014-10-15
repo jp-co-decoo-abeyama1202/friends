@@ -10,58 +10,44 @@ require_once('/home/homepage/html/public/friends/inc/define.php');
 /*
 if(IS_TEST) {
     $test_params = array(
-        'user_id' => 'EgdbaamiMtkr85SvlorzyvsvDuk00m',
-        'type' => 'from',
+        'user_id' => 'Ck5X2BWykFpOI6qf1aC9auuWBX4eBq',
+        'type' => 'to',
         'offset' => 0,
         'count' => 30,
     );
     $_POST['params'] = json_encode($test_params);
 }
 */
-//受信jsonパラメータ
-$json = isset($_POST['params']) ? $_POST['params'] : '';
-$params = json_decode($json,true);
-//存在チェック
-$token = isset($params['user_id']) ? $params['user_id'] : null;
-if(is_null($token)) {
-    error_log('userUpdateError:必要なパラメータ[user_id]が足りません');
-    http_response_code(400);
-    exit;
-}
 try {
+    //受信jsonパラメータ
+    $json = isset($_POST['params']) ? $_POST['params'] : '';
+    $params = json_decode($json,true);
+    //存在チェック
+    $token = isset($params['user_id']) ? $params['user_id'] : null;
+    if(is_null($token)) {
+        throw new \library\NotParamsException();
+    }
     $user = $storage->User->getDataFromToken($token);
-    if(!$user) {
-        //存在しないユーザ
-        error_log('friendRequestList Error：this user is not found > '.$token);
-        http_response_code(400);
-        exit;
-    }
-} catch (PDOException $ex) {
-    error_log($e->getMessage());
-    http_response_code(400);
-    exit;
-}
-$id = (int)$user['id'];
-$type = isset($params['type']) ? $params['type'] : 'from';
-$offset = isset($params['offset']) ? (int)$params['offset'] : 0;
-$count = isset($params['count']) ? (int)$params['count'] : \library\Model_UserRequestFrom::DEFAULT_COUNT;
-try{
+    $id = (int)$user['id'];
+    $type = isset($params['type']) && $params['type'] == 'to' ? $params['type'] : 'from';
+    $offset = isset($params['offset']) ? (int)$params['offset'] : 0;
+    $count = isset($params['count']) ? (int)$params['count'] : \library\Model_UserRequestFrom::DEFAULT_COUNT;
     if($type === 'to') {
-        $list = $storage->UserRequestTo->getList($id);
+        list($list,$allCount) = $storage->UserRequestTo->getList($id,$offset,$count);
     } else {
-        $list = $storage->UserRequestFrom->getList($id);
+        list($list,$allCount) = $storage->UserRequestFrom->getList($id,$offset,$count);
     }
-}catch(Exception $e) {
-    error_log($e->getMessage());
-    http_response_code(400);
-    exit;
+    $ret = array(
+        'user_id' => $token,
+        'type' => $type,
+        'count' => $allCount,
+        'list' => $list,
+        'option' => array(
+            'offset' => $offset,
+            'count' => $count,
+        ),
+    );
+    return \library\Response::json($ret);
+} catch(Exception $e) {
+    return \library\Response::error($e);
 }
-$ret = array(
-    'user_id' => $token,
-    'type' => $type,
-    'offset' => $offset,
-    'count' => count($list),
-    'list' => $list,
-);
-echo json_encode($ret);
-return http_response_code(200);

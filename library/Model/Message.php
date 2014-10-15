@@ -72,7 +72,8 @@ class Model_Message extends ShardingModel {
         
         $id = 0;
         if($result) {
-            $id = $this->lastInsertId();
+            $id = (int)$this->lastInsertId();
+            $this->_storage->Friends->addMessage($friendsId,$id);
         }
         return $id;
     }
@@ -117,6 +118,50 @@ class Model_Message extends ShardingModel {
     }
     
     /**
+     * 削除にする
+     * @param int $friendsId
+     * @param array $ids
+     * @return bool
+     * @throws \InvalidArgumentException
+     */
+    public function delete($friendsId,$ids)
+    {
+        $this->checkInt($friendsId,$ids);
+        list($_,$tableName) = $this->getTableName($friendsId);
+        $sql = 'UPDATE ' . $tableName . " SET delete_flag = :delete_flag,update_time = :update_time WHERE id IN(".implode(',',$ids).")";
+        $stmt = $this->_con->prepare($sql);
+        $stmt->bindValue(':delete_flag',self::DELETE_ON,$this->_data_types['delete_flag']);
+        $stmt->bindValue(':update_time',time(),$this->_data_types['update_time']);
+        if((bool)$stmt->execute()) {
+            $id = $this->getLastMessageId($friendsId);
+            $this->_storage->Friends->addMessage($friendsId,$id);
+        } else {
+            return false;
+        }
+        return true;
+    }
+    
+    /**
+     * 指定friendsIdのメッセージを全削除
+     * @param int $friendsId
+     * @return bool
+     * @throws \InvalidArgumentException
+     */
+    public function deleteAll($friendsId)
+    {
+        if(!$friendsId) {
+            throw new \InvalidArgumentException();
+        }
+        list($_,$tableName) = $this->getTableName($friendsId);
+        $sql = 'UPDATE ' . $tableName . " SET delete_flag = :delete_flag,update_time = :update_time WHERE friends_id = :friends_id";
+        $stmt = $this->_con->prepare($sql);
+        $stmt->bindValue(':delete_flag',self::DELETE_ON,$this->_data_types['delete_flag']);
+        $stmt->bindValue(':update_time',time(),$this->_data_types['update_time']);
+        $stmt->bindValue(':friends_id',$friendsId,$this->_data_types['friends_id']);
+        return (bool)$stmt->execute();
+    }
+    
+    /**
      * メッセージを取得する
      * @param int $friendsId
      * @param int $offset
@@ -130,9 +175,10 @@ class Model_Message extends ShardingModel {
             throw new \InvalidArgumentException();
         }
         list($ids,$tableName) = $this->getTableName($friendsId);
-        $sql = 'SELECT id,sender_id,message,read_flag,create_time,update_time FROM ' . $tableName . " WHERE friends_id = :friends_id ORDER BY create_time DESC,id DESC LIMIT " . $offset . "," . $count;
+        $sql = 'SELECT id,sender_id,message,read_flag,create_time,update_time FROM ' . $tableName . " WHERE friends_id = :friends_id AND delete_flag = :delete_flag ORDER BY create_time DESC,id DESC LIMIT " . $offset . "," . $count;
         $stmt = $this->_con->prepare($sql);
         $stmt->bindValue(':friends_id',$friendsId,$this->_data_types['friends_id']);
+        $stmt->bindValue(':delete_flag',self::DELETE_OFF,$this->_data_types['delete_flag']);
         $stmt->execute();
         return $stmt->fetchAll(\PDO::FETCH_ASSOC);
     }
@@ -159,6 +205,74 @@ class Model_Message extends ShardingModel {
             $ret[$id] = $row;
         }
         return $ret;
+    }
+    
+    /**
+     * 指定されたフレンズ間の最終メッセージIDを取得する
+     * @param int $friendsId
+     * @return int
+     */
+    public function getLastMessageId($friendsId)
+    {
+        list($Ids,$tableName) = $this->getTableName($friendsId);
+        $sql = 'SELECT id FROM ' . $tableName . ' WHERE id IN ( SELECT MAX(id) FROM '.$tableName.' as m WHERE friends_id = :friends_id AND delete_flag = :delete_flag GROUP BY friends_id)';
+        $stmt = $this->_con->prepare($sql);
+        $stmt->bindValue(':friends_id',$friendsId,$this->_data_types['friends_id']);
+        $stmt->bindValue(':delete_flag',self::DELETE_OFF,$this->_data_types['delete_flag']);
+        $stmt->execute();
+        return (int)$stmt->fetchColumn();
+    }
+    
+    public function primaryNotDelete($ids)
+    {
+        $list = $this->primary($ids);
+        $ret = array();
+        foreach($list as $row) {
+            if($row['delete_flag'] != self::DELETE_OFF) {
+               continue;
+            }
+            $id = (int)$row['id'];
+            $ret[] = $row;
+        }
+        return $ret;
+    }
+    
+    /**
+     * トークタブに表示する内容を取得
+     * @param int $userId
+     * @return type
+     */
+    public function getNewMessages($userId)
+    {
+        $this->checkInt($userId);
+        //フレンド情報取得
+        $friends = $this->_storage->Friends->getFriendsUserAll($userId);
+        $lastMessageIds = $this->_storage->Friends->getLastMessageIds($userId);
+        $primaryKeys = array();
+        foreach($lastMessageIds as $friendsId => $messageId) {
+            $primaryKeys[] = array(
+                'id' => $messageId,
+                'friends_id' => $friendsId,
+            );
+        }
+        $messages = $this->primaryNotDelete($primaryKeys);
+        $ret = array();
+        $notRead = 0;
+        foreach($messages as $row) {
+            $friendsId = (int)$row['friends_id'];
+            $senderId = (int)$row['sender_id'];
+            $row['sender'] = $userId === $senderId ? self::SENDER_MINE : self::SENDER_FRINDS;
+            $row['friend'] = $friends[$friendsId];
+            //不要な内容を削除
+            unset($row['friends_id']);
+            unset($row['sender_id']);
+            unset($row['delete_flag']);
+            $ret[] = $row;
+            if((int)$row['read_flag'] === self::READ_OFF && $senderId !== $userId) {
+                ++$notRead;
+            }
+        }
+        return array($ret,$notRead);
     }
     
     /**

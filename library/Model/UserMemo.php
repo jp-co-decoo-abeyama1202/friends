@@ -5,8 +5,8 @@
  *
  * @author Administrator
  */
-namespace library\admin;
-class Model_UserMemo extends \library\Model
+namespace library;
+class Model_UserMemo extends Model
 {
     protected $_table_name = 'user_memo';
     protected $_data_types = array(

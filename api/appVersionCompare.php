@@ -2,10 +2,6 @@
 /**
  * アプリが審査中かを返す
  * 最新バージョンの管理は friends/inc/define.php
- * Created by PhpStorm.
- * User: ishii
- * Date: 14/07/28
- * Time: 18:34
  */
 require('../inc/define.php');
 /*
@@ -29,6 +25,5 @@ if($compare === 1) {
     //現行バージョンより大きいので審査中扱い
     $isDemand = true;
 }
-$j = json_encode(array('version'=>NOW_VERSION,'compare'=>$compare,'is_demand'=>$isDemand));
-echo $j;
-return http_response_code(200);
+$response = array('version'=>NOW_VERSION,'compare'=>$compare,'is_demand'=>$isDemand);
+return \library\Response::json($response);
