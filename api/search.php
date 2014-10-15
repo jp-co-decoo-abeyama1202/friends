@@ -43,6 +43,8 @@ try {
     if($user['login_time'] + 60 < time()) {
         $storage->beginTransaction();
         $result = $storage->User->updateLogintime($id);
+        //UUの集計
+        $storage->UuDaily->add($id);
         $storage->commit();
     }
     return \library\Response::json($list);

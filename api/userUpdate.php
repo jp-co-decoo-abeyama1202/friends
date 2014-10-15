@@ -24,7 +24,6 @@ try {
     $user = $storage->User->getDataFromToken($token);
     //クエリ発行
     $id = (int)$user['id'];
-    $uuAdd = false;
     $storage->beginTransaction();
     $result1 = $result2 = $result3 = true;
     $now = time();
@@ -45,7 +44,6 @@ try {
         }
         if(isset($values['login_time'])) {
             $values['login_time'] = $now;
-            $uuAdd = true;
         }
         $values['update_time'] = $now;
         $result1 = $storage->User->updatePrimaryOne($values,$id);
@@ -77,11 +75,6 @@ try {
     }
     if(!$result1 || !$result2 || !$result3) {
         throw new ErrorException();
-    }
-    
-    //UUの集計
-    if($uuAdd) {
-        $storage->UuDaily->add($id);
     }
     $storage->commit();
     return \library\Response::success();

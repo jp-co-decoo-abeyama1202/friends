@@ -38,6 +38,9 @@ try {
     $id = (int)$user['id'];
     $storage->beginTransaction();
     $storage->User->login($id,$pushId);
+    //UUの集計
+    $storage->UuDaily->add($id);
+    
     $storage->commit();
     return \library\Response::json($response);
 } catch(Exception $e) {
